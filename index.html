@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NG File Processor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial, sans-serif;
+}
+
+body{
+    background:linear-gradient(135deg,#3b82f6,#7c3aed);
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:20px;
+}
+
+.container{
+    width:100%;
+    max-width:700px;
+    background:#fff;
+    border-radius:25px;
+    padding:25px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.25);
+}
+
+.title{
+    text-align:center;
+    font-size:28px;
+    font-weight:bold;
+    color:#4f46e5;
+    margin-bottom:20px;
+}
+
+.drop-zone{
+    border:3px dashed #7c3aed;
+    border-radius:20px;
+    padding:50px 20px;
+    text-align:center;
+    cursor:pointer;
+    transition:0.3s;
+    background:#f5f3ff;
+}
+
+.drop-zone:hover{
+    background:#ede9fe;
+}
+
+.drop-zone.dragover{
+    background:#ddd6fe;
+    transform:scale(1.02);
+}
+
+.drop-text{
+    font-size:18px;
+    color:#4b5563;
+    margin-bottom:10px;
+}
+
+.support{
+    color:#6b7280;
+    font-size:14px;
+}
+
+.file-list{
+    margin-top:20px;
+}
+
+.file-item{
+    background:#f3f4f6;
+    padding:12px;
+    border-radius:12px;
+    margin-bottom:10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.process-btn,
+.download-btn{
+    width:100%;
+    border:none;
+    padding:15px;
+    border-radius:15px;
+    color:#fff;
+    font-size:18px;
+    font-weight:bold;
+    cursor:pointer;
+    margin-top:15px;
+    transition:0.3s;
+}
+
+.process-btn{
+    background:#4f46e5;
+}
+
+.process-btn:hover{
+    background:#4338ca;
+}
+
+.download-btn{
+    background:#10b981;
+    display:none;
+}
+
+.download-btn:hover{
+    background:#059669;
+}
+
+.status{
+    margin-top:15px;
+    text-align:center;
+    font-weight:bold;
+    color:#374151;
+}
+
+.hidden{
+    display:none;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="title">NG File Processor</div>
+
+    <div class="drop-zone" id="dropZone">
+        <div class="drop-text">Click or Drag & Drop Files</div>
+        <div class="support">Supports .zip .7z .meta .bytes</div>
+        <input type="file" id="fileInput" multiple class="hidden">
+    </div>
+
+    <div class="file-list" id="fileList"></div>
+
+    <button class="process-btn" id="processBtn">Process File</button>
+
+    <button class="download-btn" id="downloadBtn">Download Processed ZIP</button>
+
+    <div class="status" id="status"></div>
+
+</div>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const processBtn = document.getElementById('processBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const statusText = document.getElementById('status');
+
+let selectedFiles = [];
+let processedBlob = null;
+
+function renderFiles(){
+    fileList.innerHTML = '';
+
+    selectedFiles.forEach((file,index)=>{
+        const item = document.createElement('div');
+        item.className = 'file-item';
+
+        item.innerHTML = `
+            <span>${file.name}</span>
+            <button onclick="removeFile(${index})">X</button>
+        `;
+
+        fileList.appendChild(item);
+    });
+}
+
+function removeFile(index){
+    selectedFiles.splice(index,1);
+    renderFiles();
+}
+
+function addFiles(files){
+    for(let file of files){
+        selectedFiles.push(file);
+    }
+
+    renderFiles();
+}
+
+dropZone.addEventListener('click',()=>fileInput.click());
+
+fileInput.addEventListener('change',(e)=>{
+    addFiles(e.target.files);
+});
+
+dropZone.addEventListener('dragover',(e)=>{
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+});
+
+dropZone.addEventListener('dragleave',()=>{
+    dropZone.classList.remove('dragover');
+});
+
+dropZone.addEventListener('drop',(e)=>{
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+
+    addFiles(e.dataTransfer.files);
+});
+
+async function processFiles(){
+
+    if(selectedFiles.length === 0){
+        alert('Upload files first');
+        return;
+    }
+
+    statusText.innerText = 'Processing Files...';
+
+    const zip = new JSZip();
+
+    for(let file of selectedFiles){
+
+        const arrayBuffer = await file.arrayBuffer();
+        let uint = new Uint8Array(arrayBuffer);
+
+        // Generic sample processing
+        // You can add your own processing logic here
+
+        for(let i=0;i<uint.length;i++){
+            if(uint[i] === 0x00){
+                uint[i] = 0x01;
+            }
+        }
+
+        zip.file(file.name, uint);
+    }
+
+    processedBlob = await zip.generateAsync({type:'blob'});
+
+    downloadBtn.style.display = 'block';
+
+    statusText.innerText = 'Processing Complete';
+}
+
+processBtn.addEventListener('click',processFiles);
+
+downloadBtn.addEventListener('click',()=>{
+
+    if(!processedBlob) return;
+
+    const a = document.createElement('a');
+
+    a.href = URL.createObjectURL(processedBlob);
+    a.download = 'Processed_Files.zip';
+
+    a.click();
+});
+</script>
+
+</body>
+</html>
